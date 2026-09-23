@@ -1,77 +1,41 @@
-import time
-import json
+import argparse
 
-DATA_FILE = "drivers.json"
-
-
-def load_drivers(path=DATA_FILE):
-    with open(path, "r") as f:
-        return json.load(f)
+from kigali_express.benchmark import run_benchmark
+from kigali_express.data import load_drivers
+from kigali_express.search import build_driver_hashmap, hashmap_search
 
 
-def linear_search(drivers_list, target_id):
-    for driver in drivers_list:
-        if driver["driver_id"] == target_id:
-            return driver
-    return None
+def print_report(results, num_drivers, num_requests):
+    line = "-" * 66
+    print("\nKigali Express - Driver Lookup Benchmark")
+    print(f"{num_drivers:,} drivers | {num_requests:,} requests\n")
+    print(line)
+    print(f"{'Method':<16}{'Setup (ms)':>12}{'All lookups (ms)':>18}{'Per lookup (us)':>18}")
+    print(line)
+    for r in results:
+        print(f"{r['method']:<16}{r['setup_s'] * 1000:>12.3f}"
+              f"{r['total_s'] * 1000:>18.3f}{r['per_lookup_us']:>18.3f}")
+    print(line)
+
+    baseline = results[0]["total_s"]
+    for r in results[1:]:
+        print(f"{r['method']:<16} is {baseline / r['total_s']:,.0f}x faster than Linear Search")
+    print()
 
 
-def binary_search(sorted_drivers_list, target_id):
-    low = 0
-    high = len(sorted_drivers_list) - 1
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--requests", type=int, default=1000)
+    args = parser.parse_args()
 
-    while low <= high:
-        mid = (low + high) // 2
-        mid_driver = sorted_drivers_list[mid]
+    drivers = load_drivers()
+    results = run_benchmark(drivers, num_requests=args.requests)
+    print_report(results, len(drivers), args.requests)
 
-        if mid_driver["driver_id"] == target_id:
-            return mid_driver
-        elif mid_driver["driver_id"] < target_id:
-            low = mid + 1
-        else:
-            high = mid - 1
-
-    return None
+    drivers_by_id = build_driver_hashmap(drivers)
+    driver = hashmap_search(drivers_by_id, "KGL-04217")
+    print(f"Lookup KGL-04217 -> {driver['name']}, {driver['vehicle']}, {driver['sector']}\n")
 
 
-def build_driver_hashmap(drivers_list):
-    driver_dict = {}
-    for driver in drivers_list:
-        driver_dict[driver["driver_id"]] = driver
-    return driver_dict
-
-
-def hashmap_search(driver_dict, target_id):
-    return driver_dict.get(target_id)
-
-
-def time_it(func, *args):
-    start = time.time()
-    result = func(*args)
-    elapsed = time.time() - start
-    return result, elapsed
-
-
-drivers_list = load_drivers()
-sorted_drivers_list = sorted(drivers_list, key=lambda d: d["driver_id"])
-drivers_hashmap = build_driver_hashmap(drivers_list)
-target_id = drivers_list[-1]["driver_id"]
-
-
-methods = [
-    ("Linear Search", linear_search, drivers_list),
-    ("Binary Search", binary_search, sorted_drivers_list),
-    ("HashMap Search", hashmap_search, drivers_hashmap),
-]
-
-times = {}
-
-for label, func, data in methods:
-    result, elapsed = time_it(func, data, target_id)
-    times[label] = elapsed
-    print(f"{label:<15}: {elapsed:.6f} sec  -> {result}")
-
-print()
-for label in ["Binary Search", "HashMap Search"]:
-    speedup = times["Linear Search"] / times[label]
-    print(f"{label} is {speedup:.1f}x faster")
+if __name__ == "__main__":
+    main()
