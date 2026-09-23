@@ -1,5 +1,10 @@
 # Kigali Express Driver Lookup
 
+TEAM MEMBERS
+-Kenny Daniel Kamanzi
+-Manzi Mulinda Divin Elvis
+-Dusabamahoro Olivier
+
 ## Project Overview
 
 This project explores different ways of searching for a driver using their driver ID.
